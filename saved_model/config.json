@@ -1,0 +1,22 @@
+{
+  "feature_names": [
+    "PTS",
+    "FGM",
+    "FGA",
+    "FG_PCT",
+    "FG3M",
+    "FG3A",
+    "FG3_PCT",
+    "FTM",
+    "FTA",
+    "FT_PCT",
+    "OREB",
+    "DREB",
+    "REB",
+    "AST",
+    "TOV",
+    "STL",
+    "BLK"
+  ],
+  "team_col": "TEAM_ABBREVIATION"
+}
