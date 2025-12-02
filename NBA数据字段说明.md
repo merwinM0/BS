@@ -52,11 +52,63 @@
 ### 状态字段
 - **AVAILABLE_FLAG**: 数据可用性标志
 
+## Box Score数据文件字段特征
+
+### 比赛信息字段
+- **season_year**: 赛季年份 (如2010-11)
+- **game_date**: 比赛日期
+- **gameId**: 比赛ID
+- **matchup**: 比赛对阵 (如"NJN @ CLE")
+
+### 球队信息字段
+- **teamId**: 球队ID
+- **teamCity**: 球队城市
+- **teamName**: 球队名称
+- **teamTricode**: 球队三字母缩写 (如GSW, MIL)
+- **teamSlug**: 球队slug
+
+### 球员信息字段
+- **personId**: 球员ID
+- **personName**: 球员姓名
+- **position**: 位置
+- **comment**: 备注 (如"DNP - Coach's Decision")
+- **jerseyNum**: 球衣号码
+
+### 比赛统计字段
+- **minutes**: 出场分钟数
+- **fieldGoalsMade**: 投篮命中数
+- **fieldGoalsAttempted**: 投篮出手数
+- **fieldGoalsPercentage**: 投篮命中率
+- **threePointersMade**: 三分命中数
+- **threePointersAttempted**: 三分出手数
+- **threePointersPercentage**: 三分命中率
+- **freeThrowsMade**: 罚球命中数
+- **freeThrowsAttempted**: 罚球出手数
+- **freeThrowsPercentage**: 罚球命中率
+- **reboundsOffensive**: 进攻篮板
+- **reboundsDefensive**: 防守篮板
+- **reboundsTotal**: 总篮板
+- **assists**: 助攻
+- **steals**: 抢断
+- **blocks**: 盖帽
+- **turnovers**: 失误
+- **foulsPersonal**: 个人犯规
+- **points**: 得分
+- **plusMinusPoints**: 正负值
+
 ## 数据文件说明
 
 ### 两个Totals文件的区别
 - **regular_season_totals_2010_2024.csv**: 常规赛数据
 - **play_off_totals_2010_2024.csv**: 季后赛数据
+
+字段结构完全一致，只是数据来源不同（常规赛vs季后赛）。
+
+### 两个Box Score文件的区别
+- **regular_season_box_scores_2010_2024_part_1.csv**: 常规赛球员数据 (第一部分)
+- **regular_season_box_scores_2010_2024_part_2.csv**: 常规赛球员数据 (第二部分)
+- **regular_season_box_scores_2010_2024_part_3.csv**: 常规赛球员数据 (第三部分)
+- **play_off_box_scores_2010_2024.csv**: 季后赛球员数据
 
 字段结构完全一致，只是数据来源不同（常规赛vs季后赛）。
 
