@@ -22,6 +22,6 @@
     "PFD",
     "PTS"
   ],
-  "window_size": 3,
+  "window_size": 10,
   "feature_dim": 21
 }

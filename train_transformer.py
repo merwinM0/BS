@@ -8,15 +8,15 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description='训练NBA Transformer预测模型')
-    parser.add_argument('--window_size', type=int, default=3, help='滑动窗口大小(默认3场比赛)')
+    parser.add_argument('--window_size', type=int, default=10, help='滑动窗口大小(默认10场比赛)')
     parser.add_argument('--test_year', type=str, default='2023-24', help='测试集年份(默认2023-24)')
-    parser.add_argument('--d_model', type=int, default=128, help='Transformer模型维度(默认128)')
-    parser.add_argument('--nhead', type=int, default=8, help='注意力头数(默认8)')
+    parser.add_argument('--d_model', type=int, default=1024, help='Transformer模型维度(默认1024)')
+    parser.add_argument('--nhead', type=int, default=16, help='注意力头数(默认16)')
     parser.add_argument('--num_layers', type=int, default=4, help='Transformer层数(默认4)')
     parser.add_argument('--dropout', type=float, default=0.1, help='Dropout率(默认0.1)')
-    parser.add_argument('--epochs', type=int, default=50, help='训练轮数(默认50)')
-    parser.add_argument('--batch_size', type=int, default=64, help='批次大小(默认64)')
-    parser.add_argument('--lr', type=float, default=0.0001, help='学习率(默认0.0001)')
+    parser.add_argument('--epochs', type=int, default=100, help='训练轮数(默认100)')
+    parser.add_argument('--batch_size', type=int, default=256, help='批次大小(默认256)')
+    parser.add_argument('--lr', type=float, default=0.00001, help='学习率(默认0.00001)')
     parser.add_argument('--weight_decay', type=float, default=1e-4, help='权重衰减(默认1e-4)')
     parser.add_argument('--label_smoothing', type=float, default=0.1, help='标签平滑(默认0.1)')
     
