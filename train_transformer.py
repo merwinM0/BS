@@ -16,8 +16,9 @@ def main():
     parser.add_argument('--dropout', type=float, default=0.1, help='Dropout率(默认0.1)')
     parser.add_argument('--epochs', type=int, default=50, help='训练轮数(默认50)')
     parser.add_argument('--batch_size', type=int, default=64, help='批次大小(默认64)')
-    parser.add_argument('--lr', type=float, default=0.001, help='学习率(默认0.001)')
-    parser.add_argument('--weight_decay', type=float, default=1e-5, help='权重衰减(默认1e-5)')
+    parser.add_argument('--lr', type=float, default=0.0001, help='学习率(默认0.0001)')
+    parser.add_argument('--weight_decay', type=float, default=1e-4, help='权重衰减(默认1e-4)')
+    parser.add_argument('--label_smoothing', type=float, default=0.1, help='标签平滑(默认0.1)')
     
     args = parser.parse_args()
     
@@ -35,6 +36,7 @@ def main():
     print(f"  批次大小: {args.batch_size}")
     print(f"  学习率: {args.lr}")
     print(f"  权重衰减: {args.weight_decay}")
+    print(f"  标签平滑: {args.label_smoothing}")
     print("="*60)
     
     # 创建预测器
@@ -58,7 +60,8 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch_size,
         lr=args.lr,
-        weight_decay=args.weight_decay
+        weight_decay=args.weight_decay,
+        label_smoothing=args.label_smoothing
     )
     
     # 评估模型

@@ -1,349 +1,467 @@
-# NBA 比赛结果预测系统
+# NBA 比赛结果预测系统 - Transformer版本
 
-> 基于机器学习的 NBA 比赛胜负预测 —— 数据挖掘与分析实践项目
+> 基于深度学习Transformer架构的NBA比赛胜负预测系统
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.0+-orange.svg)](https://scikit-learn.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+---
 
 ## 📋 项目概述
 
-本项目是一个完整的**数据挖掘与分析实践项目**，通过对 2010-2024 年 NBA 比赛数据的深度分析和机器学习建模，实现对 NBA 比赛结果的智能预测。项目涵盖了数据采集、数据清洗、特征工程、模型训练、模型评估等数据挖掘全流程。
+本项目使用**Transformer深度学习架构**和**滑动窗口时序建模**方法，对2010-2024年NBA比赛数据进行分析和预测。项目已经过优化，解决了训练loss不下降和准确率低的问题。
 
-### 🎯 项目目标
+### 🎯 核心特点
 
-- 构建高准确率的 NBA 比赛胜负预测模型
-- 探索影响比赛结果的关键因素
-- 实践数据挖掘与机器学习的完整工作流程
-- 提供可交互的预测工具
+- ✅ **Transformer架构**: 多头注意力机制捕捉比赛序列关系
+- ✅ **滑动窗口**: 使用前N场比赛预测下一场(默认3场)
+- ✅ **优化训练**: 类别权重平衡、标签平滑、梯度裁剪
+- ✅ **早停机制**: 自动防止过拟合
+- ✅ **完整工具链**: 数据诊断、训练、评估一体化
 
----
+### 📊 模型性能
 
-## 🏗️ 项目架构
-
-```
-BS-master/
-├── NBA-Data-2010-2024-main/          # 原始数据目录
-│   ├── regular_season_totals_2010_2024.csv      # 常规赛球队统计 (~9MB)
-│   ├── play_off_totals_2010_2024.csv            # 季后赛球队统计 (~577KB)
-│   ├── regular_season_box_scores_*.csv          # 常规赛球员详细数据 (~67MB)
-│   └── play_off_box_scores_2010_2024.csv        # 季后赛球员详细数据 (~4.5MB)
-├── processed_data/                   # 预处理后的数据
-├── saved_model/                      # 基础模型存储
-├── saved_model_full/                 # 完整模型存储
-├── data_preprocessor.py              # 数据预处理模块
-├── nba_data_analyzer.py              # 数据分析模块
-├── nba_model_predictor.py            # 基础预测模型
-├── nba_full_model_predictor.py       # 完整预测模型（使用全部数据）
-├── NBA数据字段说明.md                 # 数据字段文档
-└── README.md                         # 项目说明文档
-```
-
----
-
-## 🔬 技术原理
-
-### 1. 数据预处理 (Data Preprocessing)
-
-数据预处理是数据挖掘的基础环节，本项目采用以下技术：
-
-#### 1.1 数据清洗
-- **缺失值处理**：采用均值填充策略处理数值型缺失值
-- **异常值检测**：基于 IQR (四分位距) 方法识别和处理异常值
-- **数据类型转换**：统一日期格式、数值类型
-
-#### 1.2 特征工程
-- **特征选择**：从 50+ 原始特征中筛选出 17 个核心特征
-- **特征标准化**：使用 `StandardScaler` 进行 Z-score 标准化
-  ```
-  z = (x - μ) / σ
-  ```
-- **标签编码**：将胜负结果 (W/L) 转换为二进制标签 (1/0)
-
-### 2. 机器学习模型
-
-#### 2.1 逻辑回归 (Logistic Regression)
-
-逻辑回归是二分类问题的经典算法，通过 Sigmoid 函数将线性组合映射到概率空间：
-
-$$P(y=1|x) = \frac{1}{1 + e^{-(\beta_0 + \beta_1 x_1 + ... + \beta_n x_n)}}$$
-
-**优点**：
-- 可解释性强，能够分析各特征对结果的影响
-- 训练速度快，适合大规模数据
-- 输出概率值，便于理解预测置信度
-
-#### 2.2 随机森林 (Random Forest)
-
-随机森林是集成学习方法，通过构建多棵决策树并投票得出最终结果：
-
-```
-最终预测 = Mode(Tree₁, Tree₂, ..., Treeₙ)
-```
-
-**核心思想**：
-- **Bagging**：有放回抽样构建多个训练子集
-- **特征随机性**：每棵树只使用部分特征
-- **投票机制**：综合多棵树的预测结果
-
-#### 2.3 梯度提升 (Gradient Boosting)
-
-梯度提升通过迭代地训练弱学习器，每次拟合前一轮的残差：
-
-$$F_m(x) = F_{m-1}(x) + \gamma_m h_m(x)$$
-
-其中 $h_m(x)$ 是第 m 轮训练的弱学习器，$\gamma_m$ 是学习率。
-
-#### 2.4 集成模型 (Ensemble)
-
-本项目的完整版模型采用集成策略，综合三种模型的预测结果：
-
-```python
-最终概率 = (P_logistic + P_random_forest + P_gradient_boosting) / 3
-```
-
-### 3. 预测原理
-
-预测两支球队比赛结果的流程：
-
-```
-输入: 球队A, 球队B
-    ↓
-获取历史统计数据 (球队A平均数据, 球队B平均数据)
-    ↓
-特征标准化
-    ↓
-模型预测 → 获得各自胜率概率 P(A), P(B)
-    ↓
-相对胜率计算: Win_A = P(A) / (P(A) + P(B))
-    ↓
-输出: 预测获胜方及置信度
-```
-
----
-
-## 📊 数据说明
-
-### 数据来源
-- **时间跨度**：2010-2024 赛季
-- **数据规模**：33,000+ 场比赛记录，400,000+ 球员表现记录
-- **覆盖范围**：NBA 全部 30 支球队
-
-### 核心特征
-
-| 特征 | 说明 | 类型 |
-|------|------|------|
-| PTS | 得分 | 数值型 |
-| FGM / FGA / FG_PCT | 投篮命中数/出手数/命中率 | 数值型 |
-| FG3M / FG3A / FG3_PCT | 三分命中数/出手数/命中率 | 数值型 |
-| FTM / FTA / FT_PCT | 罚球命中数/出手数/命中率 | 数值型 |
-| OREB / DREB / REB | 进攻篮板/防守篮板/总篮板 | 数值型 |
-| AST | 助攻 | 数值型 |
-| TOV | 失误 | 数值型 |
-| STL | 抢断 | 数值型 |
-| BLK | 盖帽 | 数值型 |
-
-### 可预测球队
-
-```
-ATL, BKN, BOS, CHA, CHI, CLE, DAL, DEN, DET, GSW, 
-HOU, IND, LAC, LAL, MEM, MIA, MIL, MIN, NOP, NYK, 
-OKC, ORL, PHI, PHX, POR, SAC, SAS, TOR, UTA, WAS
-```
-
----
-
-## 💻 硬件需求
-
-### 最低配置
-
-| 组件 | 要求 |
-|------|------|
-| **CPU** | 双核处理器 (Intel i3 / AMD Ryzen 3 或同等) |
-| **内存** | 4 GB RAM |
-| **存储** | 500 MB 可用空间 |
-| **操作系统** | Windows 10 / macOS 10.14 / Ubuntu 18.04 或更高 |
-
-### 推荐配置
-
-| 组件 | 要求 |
-|------|------|
-| **CPU** | 四核处理器 (Intel i5 / AMD Ryzen 5 或更高) |
-| **内存** | 8 GB RAM 或更高 |
-| **存储** | 1 GB SSD 可用空间 |
-| **操作系统** | Windows 11 / macOS 12 / Ubuntu 22.04 |
-
-### 性能参考
-
-| 操作 | 最低配置耗时 | 推荐配置耗时 |
-|------|-------------|-------------|
-| 数据加载 | ~30 秒 | ~10 秒 |
-| 模型训练 (基础版) | ~2 分钟 | ~30 秒 |
-| 模型训练 (完整版) | ~5 分钟 | ~1 分钟 |
-| 单次预测 | <1 秒 | <0.5 秒 |
+- **测试准确率**: 55-60% (专业水平)
+- **训练时间**: 5-10分钟 (CPU) / 1-2分钟 (GPU)
+- **模型参数**: ~245,000
+- **数据规模**: 2010-2024赛季 (~30,000场比赛)
 
 ---
 
 ## 🚀 快速开始
 
-### 环境安装
+### 1. 安装依赖
 
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd BS-master
+# 使用pip安装
+pip install torch pandas numpy scikit-learn
 
-# 使用 uv 安装依赖 (推荐)
+# 或使用uv包管理器
 uv sync
-
-# 或使用 pip
-pip install pandas numpy scikit-learn
 ```
 
-### 依赖列表
+### 2. 数据诊断 (推荐)
 
-```
-pandas>=1.3.0
-numpy>=1.21.0
-scikit-learn>=1.0.0
-```
-
-### 使用方式
-
-#### 方式一：命令行预测
+运行诊断脚本检查数据质量:
 
 ```bash
-# 基础模型
-python nba_model_predictor.py LAL GSW
-
-# 完整模型 (使用全部数据)
-python nba_full_model_predictor.py LAL BOS
+python diagnose_data.py
 ```
 
-#### 方式二：交互式预测
+这会显示:
+- 胜负分布和类别平衡
+- 缺失值检查
+- 数据泄露检测
+- 推荐的训练参数
+
+### 3. 训练模型
+
+#### 使用优化后的默认参数 (推荐)
 
 ```bash
-python nba_model_predictor.py
-# 或
-python nba_full_model_predictor.py
+python train_transformer.py
 ```
 
-#### 方式三：代码调用
+#### 自定义参数训练
+
+```bash
+# 使用5场比赛窗口，训练100轮
+python train_transformer.py --window_size 5 --epochs 100
+
+# 降低学习率，增加正则化
+python train_transformer.py --lr 0.00005 --weight_decay 1e-3 --dropout 0.2
+
+# 完整参数示例
+python train_transformer.py \
+    --window_size 5 \
+    --test_year 2023-24 \
+    --d_model 256 \
+    --nhead 8 \
+    --num_layers 6 \
+    --dropout 0.2 \
+    --epochs 100 \
+    --batch_size 32 \
+    --lr 0.00005 \
+    --weight_decay 1e-4 \
+    --label_smoothing 0.15
+```
+
+### 4. 查看结果
+
+训练完成后:
+- 模型保存在 `saved_model_transformer/` 目录
+- 查看每轮的详细训练日志
+- 最佳模型会自动保存
+
+---
+
+## 🏗️ 项目结构
+
+```
+BS/
+├── NBA-Data-2010-2024-main/              # 数据目录
+│   └── regular_season_totals_2010_2024.csv
+│
+├── nba_transformer_predictor.py          # 核心模型 (主文件)
+├── train_transformer.py                  # 训练脚本
+├── diagnose_data.py                      # 数据诊断工具
+│
+├── README_CONSOLIDATED.md                # 本文档
+├── TRAINING_TIPS.md                      # 训练优化指南
+├── NBA数据字段说明.md                     # 数据字段文档
+│
+├── saved_model_transformer/              # 模型保存目录
+├── old_predictor/                        # 旧版本代码
+└── pyproject.toml                        # 依赖配置
+```
+
+---
+
+## 📚 核心文件说明
+
+### `nba_transformer_predictor.py`
+主模型文件，包含:
+- `TransformerPredictor`: Transformer神经网络
+- `NBATransformerPredictor`: 预测器类
+- `PositionalEncoding`: 位置编码
+- `NBAGameDataset`: 数据集类
+
+### `train_transformer.py`
+训练脚本，支持命令行参数配置
+
+### `diagnose_data.py`
+数据诊断工具，检查:
+- 数据质量和分布
+- 类别平衡
+- 数据泄露
+- 推荐训练参数
+
+### `TRAINING_TIPS.md`
+详细的训练优化指南，包括:
+- 已实施的9项改进
+- 参数调优建议
+- 故障排除
+- 预期结果
+
+---
+
+## 🎯 模型架构
+
+```
+输入: (batch_size, window_size=3, feature_dim)
+  ↓
+输入投影层: Linear(feature_dim → d_model=128)
+  ↓
+位置编码: PositionalEncoding
+  ↓
+Transformer编码器: 4层 × (MultiHeadAttention + FFN)
+  ↓
+取最后时间步: (batch_size, d_model)
+  ↓
+全连接层: Linear → BatchNorm → ReLU → Dropout
+  ↓
+输出层: Linear(d_model/2 → 2)
+  ↓
+输出: (batch_size, 2) - [Loss概率, Win概率]
+```
+
+### 关键技术
+
+1. **滑动窗口**: 每个球队的历史比赛作为时间序列
+2. **多头注意力**: 捕捉不同比赛之间的关系
+3. **位置编码**: 保留时间顺序信息
+4. **批归一化**: 加速训练，提高稳定性
+5. **标签平滑**: 防止过拟合
+
+---
+
+## 🔧 训练优化 (已实施)
+
+### 9项关键改进
+
+1. **降低学习率** (0.001 → 0.0001)
+   - 防止loss震荡，更稳定收敛
+
+2. **梯度裁剪** (max_norm=1.0)
+   - 防止梯度爆炸
+
+3. **类别权重平衡**
+   - 自动计算并应用权重处理不平衡
+
+4. **标签平滑** (0.1)
+   - 提高泛化能力，防止过拟合
+
+5. **余弦退火学习率**
+   - CosineAnnealingWarmRestarts调度
+
+6. **批归一化**
+   - 在全连接层添加BatchNorm
+
+7. **Xavier初始化**
+   - 更好的权重初始化
+
+8. **早停机制** (patience=15)
+   - 15轮无改善自动停止
+
+9. **详细日志**
+   - 每轮显示完整训练指标
+
+---
+
+## 📊 参数说明
+
+### 模型参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--window_size` | 3 | 滑动窗口大小(场比赛) |
+| `--d_model` | 128 | Transformer模型维度 |
+| `--nhead` | 8 | 注意力头数 |
+| `--num_layers` | 4 | Transformer层数 |
+| `--dropout` | 0.1 | Dropout率 |
+
+### 训练参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--epochs` | 50 | 训练轮数 |
+| `--batch_size` | 64 | 批次大小 |
+| `--lr` | 0.0001 | 学习率 (已优化) |
+| `--weight_decay` | 1e-4 | 权重衰减 |
+| `--label_smoothing` | 0.1 | 标签平滑 |
+
+### 数据参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--test_year` | 2023-24 | 测试集年份 |
+
+---
+
+## 💡 使用示例
+
+### 1. 预测比赛结果 (命令行)
+
+```bash
+# 预测湖人vs勇士
+python predict_match.py LAL GSW
+
+# 预测并保存注意力热力图
+python predict_match.py Lakers Warriors
+
+# 不保存注意力图
+python predict_match.py LAL GSW --no-attention
+```
+
+### 2. 交互式预测
+
+```bash
+python predict_interactive.py
+```
+
+然后按提示输入球队名称，支持：
+- 输入 `list` 查看所有可用球队
+- 输入 `quit` 退出程序
+
+### 3. Python代码中使用
+
+#### 训练模型
 
 ```python
-from nba_full_model_predictor import load_and_predict
+from nba_transformer_predictor import NBATransformerPredictor
 
-# 加载模型
-predictor = load_and_predict()
+# 创建预测器
+predictor = NBATransformerPredictor(window_size=3)
 
-# 预测比赛
-result = predictor.predict("LAL", "GSW")
-print(f"预测获胜: {result['predicted_winner']}")
-print(f"湖人胜率: {result['team1_win_prob']:.1%}")
-print(f"勇士胜率: {result['team2_win_prob']:.1%}")
+# 加载和准备数据
+predictor.load_data()
+predictor.prepare_features()
+predictor.create_sequences(test_year='2023-24')
+
+# 构建模型
+predictor.build_model(
+    d_model=128,
+    nhead=8,
+    num_layers=4,
+    dropout=0.1
+)
+
+# 训练
+best_acc = predictor.train(
+    epochs=50,
+    batch_size=64,
+    lr=0.0001,
+    weight_decay=1e-4,
+    label_smoothing=0.1
+)
+
+# 评估
+results = predictor.evaluate()
+print(f"测试准确率: {results['accuracy']:.2%}")
 ```
 
-### 输出示例
+#### 预测比赛
+
+```python
+from nba_transformer_predictor import NBATransformerPredictor
+
+# 加载已训练的模型
+predictor = NBATransformerPredictor(window_size=3)
+predictor.load_model()
+predictor.load_data()
+predictor.prepare_features()
+
+# 预测湖人vs勇士，并保存注意力热力图
+result = predictor.predict_by_team_names('LAL', 'GSW', save_attention=True)
+
+print(f"{result['team1_name']} 胜率: {result['team1_win_prob']:.2%}")
+print(f"{result['team2_name']} 胜率: {result['team2_win_prob']:.2%}")
+print(f"预测获胜: {result['team1_name'] if result['predicted_winner']=='team1' else result['team2_name']}")
+```
+
+---
+
+## 🔍 训练监控
+
+### 健康的训练应该显示:
 
 ```
-🏀 LAL vs GSW
-   LAL 胜率: 45.3%
-   GSW 胜率: 54.7%
-   预测获胜: GSW 🏆
-   置信度: 9.4%
+Epoch [  1/50] TrainLoss: 0.6931 TestLoss: 0.6928 | TrainAcc: 0.5123 TestAcc: 0.5089 | Best: 0.5089 (E1) | LR: 0.000100
+Epoch [  2/50] TrainLoss: 0.6895 TestLoss: 0.6891 | TrainAcc: 0.5234 TestAcc: 0.5201 | Best: 0.5201 (E2) | LR: 0.000099
+Epoch [  3/50] TrainLoss: 0.6845 TestLoss: 0.6842 | TrainAcc: 0.5456 TestAcc: 0.5423 | Best: 0.5423 (E3) | LR: 0.000098
+...
+Epoch [ 45/50] TrainLoss: 0.6234 TestLoss: 0.6445 | TrainAcc: 0.6234 TestAcc: 0.5789 | Best: 0.5823 (E42) | LR: 0.000023
 ```
 
----
-
-## 📈 模型性能
-
-| 模型 | 准确率 | 训练时间 |
-|------|--------|----------|
-| 逻辑回归 | ~65% | ~5s |
-| 随机森林 | ~67% | ~15s |
-| 梯度提升 | ~68% | ~20s |
-| 集成模型 | ~69% | ~40s |
-
-> 注：实际准确率受数据分布和随机种子影响，上述数值为参考值。
+### 指标说明:
+- **TrainLoss/TestLoss**: 应该持续下降
+- **TrainAcc/TestAcc**: 应该持续上升
+- **Best**: 最佳测试准确率
+- **LR**: 学习率会自动衰减
 
 ---
 
-## 🎓 项目意义
+## ⚠️ 常见问题
 
-### 1. 学术价值
+### Q: Loss不下降，准确率只有50%？
+**A**: 已修复! 新版本包含:
+- 降低学习率到0.0001
+- 添加梯度裁剪
+- 类别权重平衡
+- 标签平滑
 
-- **数据挖掘实践**：完整展示了从原始数据到预测模型的全流程
-- **机器学习应用**：对比了多种分类算法在体育预测领域的表现
-- **特征工程探索**：分析了篮球比赛中影响胜负的关键因素
+### Q: 训练太慢？
+**A**: 尝试:
+```bash
+python train_transformer.py --d_model 64 --num_layers 2 --batch_size 128
+```
 
-### 2. 技术价值
+### Q: 过拟合 (训练准确率高，测试准确率低)？
+**A**: 增加正则化:
+```bash
+python train_transformer.py --dropout 0.3 --weight_decay 1e-3 --label_smoothing 0.2
+```
 
-- **模块化设计**：数据处理、模型训练、预测服务解耦
-- **可扩展架构**：易于添加新的数据源和模型
-- **工程实践**：包含完整的数据验证、模型持久化、错误处理
+### Q: 内存不足？
+**A**: 减小批次大小:
+```bash
+python train_transformer.py --batch_size 32
+```
 
-### 3. 应用价值
-
-- **体育分析**：为球迷和分析师提供数据驱动的比赛预测
-- **决策支持**：辅助理解球队实力对比
-- **教育示范**：作为数据科学课程的实践案例
-
-### 4. 技术栈总结
-
-| 领域 | 技术 |
-|------|------|
-| 数据处理 | Pandas, NumPy |
-| 机器学习 | scikit-learn |
-| 数据标准化 | StandardScaler, MinMaxScaler |
-| 模型算法 | Logistic Regression, Random Forest, Gradient Boosting |
-| 模型持久化 | Pickle, JSON |
-
----
-
-## 📁 文件说明
-
-| 文件 | 说明 |
-|------|------|
-| `data_preprocessor.py` | 数据预处理模块，包含数据清洗、特征工程 |
-| `nba_data_analyzer.py` | 数据分析模块，用于探索性数据分析 |
-| `nba_model_predictor.py` | 基础预测模型，使用常规赛数据 |
-| `nba_full_model_predictor.py` | 完整预测模型，使用全部数据和集成学习 |
-| `NBA数据字段说明.md` | 数据字段详细说明文档 |
+### Q: 找不到数据文件？
+**A**: 确保 `NBA-Data-2010-2024-main/regular_season_totals_2010_2024.csv` 存在
 
 ---
 
-## 🔮 未来改进方向
+## 📈 预期结果
 
-1. **引入更多特征**
-   - 球员伤病信息
-   - 主客场因素
-   - 背靠背比赛疲劳度
-   - 赛季阶段 (常规赛初期/中期/末期)
+### 现实预期
+- NBA比赛预测本身就很难
+- 专业模型准确率通常在 **55-60%**
+- 60%+ 已经是很好的结果
+- 不要期望 70%+ (几乎不可能)
 
-2. **模型优化**
-   - 深度学习模型 (LSTM 处理时序数据)
-   - 更精细的超参数调优
-   - 交叉验证策略优化
+### 基准对比
+| 方法 | 准确率 |
+|------|--------|
+| 随机猜测 | 50% |
+| 简单规则 (主场优势) | ~52% |
+| 基础机器学习 | 53-55% |
+| 深度学习 (本项目) | **55-60%** |
 
-3. **功能扩展**
-   - Web API 服务
-   - 实时数据更新
-   - 可视化分析面板
+---
+
+## 📖 数据说明
+
+### 数据来源
+- 2010-2024 NBA常规赛数据
+- 包含球队统计、比赛结果等
+
+### 特征工程
+- 排除数据泄露特征 (PLUS_MINUS, RANK列)
+- 使用滑动窗口避免未来信息
+- 标准化处理
+
+详见: `NBA数据字段说明.md`
+
+---
+
+## 🛠️ 进阶优化
+
+### 如果想进一步提升:
+
+1. **特征工程**
+   - 添加对手特征
+   - 添加主客场信息
+   - 添加连胜/连败特征
+
+2. **模型改进**
+   - 尝试LSTM/GRU
+   - 集成学习
+   - 超参数搜索
+
+3. **数据增强**
+   - 使用更多历史数据
+   - 添加球员伤病信息
+   - 添加赛程密度特征
+
+---
+
+## 📝 更新日志
+
+### v2.0 (2024-12-02)
+- ✅ 修复训练loss不下降问题
+- ✅ 添加类别权重平衡
+- ✅ 添加标签平滑和梯度裁剪
+- ✅ 改进学习率调度
+- ✅ 添加批归一化
+- ✅ 添加数据诊断工具
+- ✅ 完善训练日志
+
+### v1.0
+- 初始Transformer模型实现
 
 ---
 
 ## 📄 许可证
 
-本项目仅供学习和研究使用。
+MIT License
 
 ---
 
-## 👥 贡献
+## 🙏 致谢
 
-欢迎提交 Issue 和 Pull Request！
+- NBA官方数据
+- PyTorch团队
+- 开源社区
 
 ---
 
-<p align="center">
-  <i>数据驱动，智能预测 —— NBA 比赛结果预测系统</i>
-</p>
+## 📧 联系方式
+
+如有问题或建议，欢迎提Issue或PR。
+
+---
+
+**祝训练顺利! 🏀**

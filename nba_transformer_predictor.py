@@ -27,6 +27,10 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib import font_manager
+
 
 class NBAGameDataset(Dataset):
     """NBA比赛数据集 - 使用滑动窗口"""
@@ -77,18 +81,32 @@ class TransformerPredictor(nn.Module):
         )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         
-        # 输出层
+        # 输出层 - 添加批归一化
         self.fc1 = nn.Linear(d_model, d_model // 2)
+        self.bn1 = nn.BatchNorm1d(d_model // 2)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(d_model // 2, 2)  # 二分类: 胜/负
         
-    def forward(self, x):
+        # 初始化权重
+        self._init_weights()
+        
+    def _init_weights(self):
+        """初始化模型权重"""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+    
+    def forward(self, x, return_attention=False):
         """
         Args:
             x: shape (batch_size, seq_len, feature_dim)
+            return_attention: 是否返回注意力权重
         Returns:
             logits: shape (batch_size, 2)
+            attention_weights: (可选) 注意力权重
         """
         # 输入投影
         x = self.input_projection(x)  # (batch, seq_len, d_model)
@@ -97,17 +115,35 @@ class TransformerPredictor(nn.Module):
         x = self.pos_encoder(x)
         
         # Transformer编码
-        x = self.transformer_encoder(x)  # (batch, seq_len, d_model)
+        if return_attention:
+            # 手动遍历每一层以获取注意力权重
+            attention_weights = []
+            for layer in self.transformer_encoder.layers:
+                # 保存输入用于残差连接
+                x_input = x
+                # 多头注意力
+                attn_output, attn_weights = layer.self_attn(x, x, x, need_weights=True, average_attn_weights=True)
+                x = x_input + layer.dropout1(attn_output)
+                x = layer.norm1(x)
+                # 前馈网络
+                x = layer.norm2(x + layer.dropout2(layer.activation(layer.linear2(layer.dropout(layer.linear1(x))))))
+                attention_weights.append(attn_weights)
+        else:
+            x = self.transformer_encoder(x)  # (batch, seq_len, d_model)
+            attention_weights = None
         
         # 取最后一个时间步的输出
         x = x[:, -1, :]  # (batch, d_model)
         
         # 全连接层
         x = self.fc1(x)
+        x = self.bn1(x)
         x = self.relu(x)
         x = self.dropout(x)
         x = self.fc2(x)  # (batch, 2)
         
+        if return_attention:
+            return x, attention_weights
         return x
 
 
@@ -319,7 +355,7 @@ class NBATransformerPredictor:
         
         return self
     
-    def train(self, epochs=50, batch_size=64, lr=0.001, weight_decay=1e-5):
+    def train(self, epochs=50, batch_size=64, lr=0.0001, weight_decay=1e-4, label_smoothing=0.1):
         """
         训练模型
         
@@ -328,6 +364,7 @@ class NBATransformerPredictor:
             batch_size: 批次大小
             lr: 学习率
             weight_decay: 权重衰减
+            label_smoothing: 标签平滑系数
         """
         print("\n" + "="*60)
         print("开始训练模型")
@@ -340,14 +377,24 @@ class NBATransformerPredictor:
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
         
-        # 损失函数和优化器
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
+        # 计算类别权重以处理不平衡
+        unique, counts = np.unique(self.train_labels, return_counts=True)
+        class_weights = torch.FloatTensor([counts.sum() / (len(unique) * c) for c in counts]).to(self.device)
+        print(f"\n类别分布: {dict(zip(unique, counts))}")
+        print(f"类别权重: {class_weights.cpu().numpy()}")
+        
+        # 损失函数和优化器 - 添加标签平滑和类别权重
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
+        optimizer = optim.AdamW(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        
+        # 使用余弦退火学习率调度
+        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
         
         best_acc = 0.0
         best_epoch = 0
-        history = {'train_loss': [], 'train_acc': [], 'test_acc': []}
+        patience_counter = 0
+        max_patience = 15
+        history = {'train_loss': [], 'train_acc': [], 'test_acc': [], 'lr': []}
         
         for epoch in range(epochs):
             # 训练阶段
@@ -364,6 +411,10 @@ class NBATransformerPredictor:
                 outputs = self.model(sequences)
                 loss = criterion(outputs, labels)
                 loss.backward()
+                
+                # 梯度裁剪防止梯度爆炸
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                
                 optimizer.step()
                 
                 train_loss += loss.item()
@@ -378,6 +429,7 @@ class NBATransformerPredictor:
             self.model.eval()
             test_correct = 0
             test_total = 0
+            test_loss = 0.0
             
             with torch.no_grad():
                 for sequences, labels in test_loader:
@@ -385,33 +437,47 @@ class NBATransformerPredictor:
                     labels = labels.to(self.device)
                     
                     outputs = self.model(sequences)
+                    loss = criterion(outputs, labels)
+                    test_loss += loss.item()
+                    
                     _, predicted = torch.max(outputs.data, 1)
                     test_total += labels.size(0)
                     test_correct += (predicted == labels).sum().item()
             
+            test_loss /= len(test_loader)
             test_acc = test_correct / test_total
+            current_lr = optimizer.param_groups[0]['lr']
             
             # 记录历史
             history['train_loss'].append(train_loss)
             history['train_acc'].append(train_acc)
             history['test_acc'].append(test_acc)
+            history['lr'].append(current_lr)
             
             # 学习率调度
-            scheduler.step(test_acc)
+            scheduler.step()
             
             # 保存最佳模型
             if test_acc > best_acc:
                 best_acc = test_acc
                 best_epoch = epoch + 1
+                patience_counter = 0
                 self.save_model()
+            else:
+                patience_counter += 1
             
-            # 打印进度
-            if (epoch + 1) % 5 == 0 or epoch == 0:
-                print(f"Epoch [{epoch+1}/{epochs}] "
-                      f"Loss: {train_loss:.4f} "
-                      f"Train Acc: {train_acc:.4f} "
-                      f"Test Acc: {test_acc:.4f} "
-                      f"Best: {best_acc:.4f} (Epoch {best_epoch})")
+            # 打印进度 - 每轮都打印以便监控
+            if (epoch + 1) % 1 == 0:
+                print(f"Epoch [{epoch+1:3d}/{epochs}] "
+                      f"TrainLoss: {train_loss:.4f} TestLoss: {test_loss:.4f} | "
+                      f"TrainAcc: {train_acc:.4f} TestAcc: {test_acc:.4f} | "
+                      f"Best: {best_acc:.4f} (E{best_epoch}) | "
+                      f"LR: {current_lr:.6f}")
+            
+            # 早停
+            if patience_counter >= max_patience:
+                print(f"\n早停触发! {max_patience}轮没有改善")
+                break
         
         print("\n" + "="*60)
         print(f"训练完成! 最佳测试准确率: {best_acc:.4f} (Epoch {best_epoch})")
@@ -524,13 +590,14 @@ class NBATransformerPredictor:
         print("✓ 模型加载成功!")
         return True
     
-    def predict_match(self, team1_history, team2_history):
+    def predict_match(self, team1_history, team2_history, return_attention=False):
         """
         预测两支球队的比赛结果
         
         Args:
             team1_history: 球队1的历史数据 (window_size场比赛的特征)
             team2_history: 球队2的历史数据 (window_size场比赛的特征)
+            return_attention: 是否返回注意力权重
         
         Returns:
             预测结果字典
@@ -549,8 +616,13 @@ class NBATransformerPredictor:
             team1_tensor = torch.FloatTensor(team1_scaled).to(self.device)
             team2_tensor = torch.FloatTensor(team2_scaled).to(self.device)
             
-            output1 = self.model(team1_tensor)
-            output2 = self.model(team2_tensor)
+            if return_attention:
+                output1, attn1 = self.model(team1_tensor, return_attention=True)
+                output2, attn2 = self.model(team2_tensor, return_attention=True)
+            else:
+                output1 = self.model(team1_tensor)
+                output2 = self.model(team2_tensor)
+                attn1, attn2 = None, None
             
             prob1 = torch.softmax(output1, dim=1)[0]  # [loss_prob, win_prob]
             prob2 = torch.softmax(output2, dim=1)[0]
@@ -563,12 +635,144 @@ class NBATransformerPredictor:
         team1_win_prob_norm = team1_win_prob / total
         team2_win_prob_norm = team2_win_prob / total
         
-        return {
+        result = {
             'team1_win_prob': team1_win_prob_norm,
             'team2_win_prob': team2_win_prob_norm,
             'predicted_winner': 'team1' if team1_win_prob_norm > team2_win_prob_norm else 'team2',
             'confidence': abs(team1_win_prob_norm - team2_win_prob_norm)
         }
+        
+        if return_attention:
+            result['team1_attention'] = attn1
+            result['team2_attention'] = attn2
+        
+        return result
+    
+    def predict_by_team_names(self, team1_name: str, team2_name: str, save_attention=True, output_dir='prediction_output'):
+        """
+        根据球队名称预测比赛结果
+        
+        Args:
+            team1_name: 球队1名称或缩写
+            team2_name: 球队2名称或缩写
+            save_attention: 是否保存注意力热力图
+            output_dir: 输出目录
+        
+        Returns:
+            预测结果字典
+        """
+        if not hasattr(self, 'raw_data') or self.raw_data is None:
+            raise ValueError("请先加载数据: predictor.load_data()")
+        
+        # 查找球队
+        team1_abbr = self._find_team(team1_name)
+        team2_abbr = self._find_team(team2_name)
+        
+        if team1_abbr is None:
+            raise ValueError(f"找不到球队: {team1_name}")
+        if team2_abbr is None:
+            raise ValueError(f"找不到球队: {team2_name}")
+        
+        # 获取最近的比赛数据
+        team1_history = self._get_recent_games(team1_abbr, self.window_size)
+        team2_history = self._get_recent_games(team2_abbr, self.window_size)
+        
+        if team1_history is None:
+            raise ValueError(f"{team1_abbr} 没有足够的历史数据")
+        if team2_history is None:
+            raise ValueError(f"{team2_abbr} 没有足够的历史数据")
+        
+        # 预测
+        result = self.predict_match(team1_history, team2_history, return_attention=save_attention)
+        result['team1_name'] = team1_abbr
+        result['team2_name'] = team2_abbr
+        
+        # 保存注意力热力图
+        if save_attention and 'team1_attention' in result:
+            os.makedirs(output_dir, exist_ok=True)
+            self._visualize_attention(
+                result['team1_attention'], 
+                team1_abbr, 
+                os.path.join(output_dir, f'attention_{team1_abbr}.png')
+            )
+            self._visualize_attention(
+                result['team2_attention'], 
+                team2_abbr, 
+                os.path.join(output_dir, f'attention_{team2_abbr}.png')
+            )
+            print(f"\n✅ 注意力热力图已保存到: {output_dir}/")
+        
+        return result
+    
+    def _find_team(self, team_name: str):
+        """查找球队缩写"""
+        team_name_upper = team_name.upper()
+        
+        # 直接匹配缩写
+        if team_name_upper in self.raw_data['TEAM_ABBREVIATION'].values:
+            return team_name_upper
+        
+        # 匹配全名
+        for abbr in self.raw_data['TEAM_ABBREVIATION'].unique():
+            team_full = self.raw_data[self.raw_data['TEAM_ABBREVIATION'] == abbr]['TEAM_NAME'].iloc[0]
+            if team_name.upper() in team_full.upper():
+                return abbr
+        
+        return None
+    
+    def _get_recent_games(self, team_abbr: str, n_games: int):
+        """获取球队最近N场比赛的数据"""
+        team_data = self.raw_data[self.raw_data['TEAM_ABBREVIATION'] == team_abbr].copy()
+        team_data = team_data.sort_values('GAME_DATE', ascending=False)
+        
+        if len(team_data) < n_games:
+            return None
+        
+        recent_games = team_data.head(n_games)
+        recent_games = recent_games.sort_values('GAME_DATE', ascending=True)
+        
+        # 提取特征
+        features = recent_games[self.feature_names].fillna(0).values
+        return features
+    
+    def _visualize_attention(self, attention_weights, team_name: str, save_path: str):
+        """
+        可视化注意力权重
+        
+        Args:
+            attention_weights: 注意力权重列表 (num_layers个张量)
+            team_name: 球队名称
+            save_path: 保存路径
+        """
+        # 设置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        num_layers = len(attention_weights)
+        fig, axes = plt.subplots(1, num_layers, figsize=(5*num_layers, 4))
+        
+        if num_layers == 1:
+            axes = [axes]
+        
+        for i, attn in enumerate(attention_weights):
+            # attn shape: (batch=1, seq_len, seq_len)
+            attn_matrix = attn[0].cpu().numpy()
+            
+            ax = axes[i]
+            sns.heatmap(attn_matrix, annot=True, fmt='.2f', cmap='YlOrRd', 
+                       ax=ax, cbar=True, square=True,
+                       xticklabels=[f'Game {j+1}' for j in range(attn_matrix.shape[1])],
+                       yticklabels=[f'Game {j+1}' for j in range(attn_matrix.shape[0])])
+            ax.set_title(f'Layer {i+1} Attention', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Key (Past Games)', fontsize=10)
+            ax.set_ylabel('Query (Past Games)', fontsize=10)
+        
+        plt.suptitle(f'{team_name} - Attention Heatmap', fontsize=14, fontweight='bold', y=1.02)
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        
+        print(f"  ✓ {team_name} 注意力热力图: {save_path}")
 
 
 def train_and_save():
