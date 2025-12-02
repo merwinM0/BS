@@ -243,7 +243,7 @@ class NBATransformerPredictor:
     
     def create_sequences(self, test_year: str = '2023-24'):
         """
-        创建滑动窗口序列
+        创建基于比赛的滑动窗口序列(路线A)
         
         Args:
             test_year: 测试集年份(最后一年)
@@ -251,77 +251,140 @@ class NBATransformerPredictor:
         Returns:
             训练集和测试集
         """
-        print(f"\n创建滑动窗口序列 (窗口大小={self.window_size})...")
-        
-        # 编码标签
-        self.raw_data['label'] = (self.raw_data['WL'] == 'W').astype(int)
-        
-        # 按球队分组
-        teams = self.raw_data['TEAM_ABBREVIATION'].unique()
-        
+        print(f"\n创建比赛级滑动窗口序列 (每场比赛包含主队+客队, 每队窗口大小={self.window_size})...")
+
+        df = self.raw_data.copy()
+
+        # 编码每行(从该球队视角)是否获胜
+        df['label_team'] = (df['WL'] == 'W').astype(int)
+
+        # 确保按时间排序
+        if 'GAME_DATE' in df.columns:
+            df['GAME_DATE'] = pd.to_datetime(df['GAME_DATE'])
+            df = df.sort_values(['TEAM_ABBREVIATION', 'GAME_DATE'])
+        else:
+            df = df.sort_values(['TEAM_ABBREVIATION', 'SEASON_YEAR'])
+
+        # 为每支球队构建自身历史窗口, 然后按 GAME_ID 组合成(主队, 客队)样本
+        game_dict = {}
+        teams = df['TEAM_ABBREVIATION'].unique()
+
+        for team in teams:
+            team_data = df[df['TEAM_ABBREVIATION'] == team].copy()
+            team_data = team_data.sort_values('GAME_DATE')
+
+            features = team_data[self.feature_names].fillna(0).values
+            labels = team_data['label_team'].values
+            game_ids = team_data['GAME_ID'].values
+            seasons = team_data['SEASON_YEAR'].values
+            matchups = team_data['MATCHUP'].values
+            dates = team_data['GAME_DATE'].values
+
+            # 对该球队的每一场比赛(从有足够历史开始)生成一段自身历史序列
+            for idx in range(self.window_size, len(team_data)):
+                seq_self = features[idx-self.window_size:idx]  # 仅包含该球队的最近N场
+                game_id = game_ids[idx]
+                season = seasons[idx]
+                matchup = matchups[idx]
+                date = dates[idx]
+                label_team = labels[idx]
+
+                # 判断主客场: MATCHUP 通常形如 "LAL vs. GSW" 或 "LAL @ GSW"
+                if isinstance(matchup, str) and 'vs.' in matchup:
+                    side = 'home'
+                elif isinstance(matchup, str) and '@' in matchup:
+                    side = 'away'
+                else:
+                    # 无法判断主客场的比赛跳过
+                    continue
+
+                if game_id not in game_dict:
+                    game_dict[game_id] = {
+                        'season': season,
+                        'date': date,
+                        'home': None,
+                        'away': None,
+                    }
+
+                game_dict[game_id][side] = {
+                    'team_abbr': team,
+                    'seq': seq_self,
+                    'label_team': int(label_team),
+                }
+
         train_sequences = []
         train_labels = []
         test_sequences = []
         test_labels = []
-        
-        for team in teams:
-            team_data = self.raw_data[self.raw_data['TEAM_ABBREVIATION'] == team].copy()
-            
-            # 分离训练集和测试集
-            train_data = team_data[team_data['SEASON_YEAR'] != test_year]
-            test_data = team_data[team_data['SEASON_YEAR'] == test_year]
-            
-            # 提取特征
-            train_features = train_data[self.feature_names].fillna(0).values
-            train_targets = train_data['label'].values
-            
-            test_features = test_data[self.feature_names].fillna(0).values
-            test_targets = test_data['label'].values
-            
-            # 创建训练集序列
-            for i in range(len(train_features) - self.window_size):
-                seq = train_features[i:i+self.window_size]
-                label = train_targets[i+self.window_size]
-                train_sequences.append(seq)
+
+        # 遍历每一场比赛, 仅保留主客队都有足够历史的样本
+        for game_id, info in game_dict.items():
+            home = info.get('home')
+            away = info.get('away')
+            season = info.get('season')
+
+            # 必须主客队都存在且都有历史序列
+            if home is None or away is None:
+                continue
+
+            # 标签: 从主队视角, 主队赢记为1
+            label = home['label_team']
+
+            # 组合序列: 先拼接主队历史, 再拼接客队历史
+            # 形状: (2 * window_size, feature_dim)
+            seq_home = home['seq']
+            seq_away = away['seq']
+
+            if seq_home.shape != seq_away.shape:
+                # 理论上不应该发生, 为安全起见跳过
+                continue
+
+            combined_seq = np.concatenate([seq_home, seq_away], axis=0)
+
+            if season != test_year:
+                train_sequences.append(combined_seq)
                 train_labels.append(label)
-            
-            # 创建测试集序列
-            for i in range(len(test_features) - self.window_size):
-                seq = test_features[i:i+self.window_size]
-                label = test_targets[i+self.window_size]
-                test_sequences.append(seq)
+            else:
+                test_sequences.append(combined_seq)
                 test_labels.append(label)
-        
+
         train_sequences = np.array(train_sequences)
         train_labels = np.array(train_labels)
         test_sequences = np.array(test_sequences)
         test_labels = np.array(test_labels)
-        
-        print(f"✓ 训练集: {len(train_sequences)} 个序列")
-        print(f"✓ 测试集: {len(test_sequences)} 个序列")
-        print(f"  序列形状: {train_sequences.shape}")
-        print(f"  训练集胜率: {train_labels.mean():.2%}")
-        print(f"  测试集胜率: {test_labels.mean():.2%}")
-        
-        # 标准化特征
-        # 将序列展平进行标准化
+
+        print(f"✓ 训练集: {len(train_sequences)} 场比赛样本")
+        print(f"✓ 测试集: {len(test_sequences)} 场比赛样本")
+        if len(train_sequences) > 0:
+            print(f"  训练序列形状: {train_sequences.shape} (seq_len=2*window_size, feature_dim={train_sequences.shape[-1]})")
+        if len(test_sequences) > 0:
+            print(f"  测试序列形状: {test_sequences.shape}")
+        if len(train_labels) > 0:
+            print(f"  训练集主队胜率: {train_labels.mean():.2%}")
+        if len(test_labels) > 0:
+            print(f"  测试集主队胜率: {test_labels.mean():.2%}")
+
+        # 标准化特征: 将序列展平后按特征维度标准化
+        if len(train_sequences) == 0 or len(test_sequences) == 0:
+            raise ValueError("训练或测试样本为空，请检查数据和窗口大小设置")
+
         n_train, seq_len, n_features = train_sequences.shape
         train_flat = train_sequences.reshape(-1, n_features)
-        
+
         self.scaler.fit(train_flat)
         train_flat_scaled = self.scaler.transform(train_flat)
         train_sequences = train_flat_scaled.reshape(n_train, seq_len, n_features)
-        
+
         n_test = len(test_sequences)
         test_flat = test_sequences.reshape(-1, n_features)
         test_flat_scaled = self.scaler.transform(test_flat)
         test_sequences = test_flat_scaled.reshape(n_test, seq_len, n_features)
-        
+
         self.train_sequences = train_sequences
         self.train_labels = train_labels
         self.test_sequences = test_sequences
         self.test_labels = test_labels
-        
+
         return self
     
     def build_model(self, d_model=128, nhead=8, num_layers=4, dropout=0.1):
