@@ -1,0 +1,120 @@
+============================================================
+NBA Transformer预测模型训练
+============================================================
+配置:
+  滑动窗口大小: 10
+  测试集年份: 2023-24
+  模型维度: 1024
+  注意力头数: 16
+  Transformer层数: 4
+  Dropout: 0.1
+  训练轮数: 100
+  批次大小: 256
+  学习率: 1e-05
+  权重衰减: 0.0001
+  标签平滑: 0.1
+============================================================
+使用设备: cuda
+滑动窗口大小: 10
+============================================================
+加载NBA数据...
+============================================================
+✓ 加载数据: 33316 条记录
+  赛季范围: 2010-11 - 2023-24
+  球队数量: 32
+
+准备特征...
+✓ 选择特征数量: 21
+  特征列表: ['MIN', 'FGM', 'FGA', 'FG_PCT', 'FG3M', 'FG3A', 'FG3_PCT', 'FTM', 'FTA', 'FT_PCT']...
+
+创建比赛级滑动窗口序列 (每场比赛包含主队+客队, 每队窗口大小=10)...
+✓ 训练集: 15253 场比赛样本
+✓ 测试集: 1230 场比赛样本
+  训练序列形状: (15253, 20, 21) (seq_len=2*window_size, feature_dim=21)
+  测试序列形状: (1230, 20, 21)
+  训练集主队胜率: 57.92%
+  测试集主队胜率: 54.31%
+
+构建Transformer模型...
+✓ 模型构建完成
+  总参数量: 50,934,274
+  可训练参数: 50,934,274
+
+============================================================
+开始训练模型
+============================================================
+
+类别分布: {np.int64(0): np.int64(6419), np.int64(1): np.int64(8834)}
+类别权重: [1.1881135 0.8633122]
+Epoch [  1/100] TrainLoss: 0.8577 TestLoss: 0.6810 | TrainAcc: 0.4817 TestAcc: 0.5821 | Best: 0.5821 (E1) | LR: 0.000010
+Epoch [  2/100] TrainLoss: 0.8217 TestLoss: 0.6863 | TrainAcc: 0.4880 TestAcc: 0.4943 | Best: 0.5821 (E1) | LR: 0.000010
+Epoch [  3/100] TrainLoss: 0.7903 TestLoss: 0.7044 | TrainAcc: 0.5126 TestAcc: 0.5130 | Best: 0.5821 (E1) | LR: 0.000009
+Epoch [  4/100] TrainLoss: 0.7676 TestLoss: 0.6829 | TrainAcc: 0.5310 TestAcc: 0.5951 | Best: 0.5951 (E4) | LR: 0.000008
+Epoch [  5/100] TrainLoss: 0.7545 TestLoss: 0.6966 | TrainAcc: 0.5491 TestAcc: 0.5325 | Best: 0.5951 (E4) | LR: 0.000007
+Epoch [  6/100] TrainLoss: 0.7513 TestLoss: 0.6632 | TrainAcc: 0.5503 TestAcc: 0.6195 | Best: 0.6195 (E6) | LR: 0.000005
+Epoch [  7/100] TrainLoss: 0.7486 TestLoss: 0.6678 | TrainAcc: 0.5516 TestAcc: 0.5951 | Best: 0.6195 (E6) | LR: 0.000003
+Epoch [  8/100] TrainLoss: 0.7430 TestLoss: 0.6671 | TrainAcc: 0.5567 TestAcc: 0.5967 | Best: 0.6195 (E6) | LR: 0.000002
+Epoch [  9/100] TrainLoss: 0.7307 TestLoss: 0.6635 | TrainAcc: 0.5600 TestAcc: 0.5976 | Best: 0.6195 (E6) | LR: 0.000001
+Epoch [ 10/100] TrainLoss: 0.7386 TestLoss: 0.6656 | TrainAcc: 0.5594 TestAcc: 0.5935 | Best: 0.6195 (E6) | LR: 0.000000
+Epoch [ 11/100] TrainLoss: 0.7345 TestLoss: 0.6645 | TrainAcc: 0.5636 TestAcc: 0.6041 | Best: 0.6195 (E6) | LR: 0.000010
+Epoch [ 12/100] TrainLoss: 0.7255 TestLoss: 0.7018 | TrainAcc: 0.5698 TestAcc: 0.5512 | Best: 0.6195 (E6) | LR: 0.000010
+Epoch [ 13/100] TrainLoss: 0.7217 TestLoss: 0.6577 | TrainAcc: 0.5742 TestAcc: 0.6106 | Best: 0.6195 (E6) | LR: 0.000010
+Epoch [ 14/100] TrainLoss: 0.7178 TestLoss: 0.7158 | TrainAcc: 0.5713 TestAcc: 0.5106 | Best: 0.6195 (E6) | LR: 0.000009
+Epoch [ 15/100] TrainLoss: 0.7088 TestLoss: 0.6525 | TrainAcc: 0.5779 TestAcc: 0.6309 | Best: 0.6309 (E15) | LR: 0.000009
+Epoch [ 16/100] TrainLoss: 0.7053 TestLoss: 0.6502 | TrainAcc: 0.5767 TestAcc: 0.6228 | Best: 0.6309 (E15) | LR: 0.000009
+Epoch [ 17/100] TrainLoss: 0.6958 TestLoss: 0.6519 | TrainAcc: 0.5851 TestAcc: 0.6154 | Best: 0.6309 (E15) | LR: 0.000008
+Epoch [ 18/100] TrainLoss: 0.6957 TestLoss: 0.6506 | TrainAcc: 0.5824 TestAcc: 0.6309 | Best: 0.6309 (E15) | LR: 0.000007
+Epoch [ 19/100] TrainLoss: 0.6899 TestLoss: 0.6517 | TrainAcc: 0.5870 TestAcc: 0.6098 | Best: 0.6309 (E15) | LR: 0.000007
+Epoch [ 20/100] TrainLoss: 0.6931 TestLoss: 0.6520 | TrainAcc: 0.5857 TestAcc: 0.6285 | Best: 0.6309 (E15) | LR: 0.000006
+Epoch [ 21/100] TrainLoss: 0.6906 TestLoss: 0.6503 | TrainAcc: 0.5874 TestAcc: 0.6146 | Best: 0.6309 (E15) | LR: 0.000005
+Epoch [ 22/100] TrainLoss: 0.6859 TestLoss: 0.6497 | TrainAcc: 0.5912 TestAcc: 0.6220 | Best: 0.6309 (E15) | LR: 0.000004
+Epoch [ 23/100] TrainLoss: 0.6856 TestLoss: 0.6511 | TrainAcc: 0.5895 TestAcc: 0.6301 | Best: 0.6309 (E15) | LR: 0.000003
+Epoch [ 24/100] TrainLoss: 0.6857 TestLoss: 0.6501 | TrainAcc: 0.5859 TestAcc: 0.6333 | Best: 0.6333 (E24) | LR: 0.000003
+Epoch [ 25/100] TrainLoss: 0.6832 TestLoss: 0.6501 | TrainAcc: 0.5956 TestAcc: 0.6285 | Best: 0.6333 (E24) | LR: 0.000002
+Epoch [ 26/100] TrainLoss: 0.6844 TestLoss: 0.6497 | TrainAcc: 0.5917 TestAcc: 0.6244 | Best: 0.6333 (E24) | LR: 0.000001
+Epoch [ 27/100] TrainLoss: 0.6812 TestLoss: 0.6496 | TrainAcc: 0.5981 TestAcc: 0.6293 | Best: 0.6333 (E24) | LR: 0.000001
+Epoch [ 28/100] TrainLoss: 0.6849 TestLoss: 0.6498 | TrainAcc: 0.5938 TestAcc: 0.6260 | Best: 0.6333 (E24) | LR: 0.000001
+Epoch [ 29/100] TrainLoss: 0.6835 TestLoss: 0.6497 | TrainAcc: 0.5931 TestAcc: 0.6268 | Best: 0.6333 (E24) | LR: 0.000000
+Epoch [ 30/100] TrainLoss: 0.6861 TestLoss: 0.6498 | TrainAcc: 0.5918 TestAcc: 0.6268 | Best: 0.6333 (E24) | LR: 0.000000
+Epoch [ 31/100] TrainLoss: 0.6818 TestLoss: 0.6527 | TrainAcc: 0.5942 TestAcc: 0.6171 | Best: 0.6333 (E24) | LR: 0.000010
+Epoch [ 32/100] TrainLoss: 0.6816 TestLoss: 0.6514 | TrainAcc: 0.5956 TestAcc: 0.6252 | Best: 0.6333 (E24) | LR: 0.000010
+Epoch [ 33/100] TrainLoss: 0.6844 TestLoss: 0.6518 | TrainAcc: 0.5940 TestAcc: 0.6276 | Best: 0.6333 (E24) | LR: 0.000010
+Epoch [ 34/100] TrainLoss: 0.6822 TestLoss: 0.6505 | TrainAcc: 0.6013 TestAcc: 0.6260 | Best: 0.6333 (E24) | LR: 0.000010
+Epoch [ 35/100] TrainLoss: 0.6834 TestLoss: 0.6610 | TrainAcc: 0.5990 TestAcc: 0.6309 | Best: 0.6333 (E24) | LR: 0.000010
+Epoch [ 36/100] TrainLoss: 0.6802 TestLoss: 0.6530 | TrainAcc: 0.6022 TestAcc: 0.6301 | Best: 0.6333 (E24) | LR: 0.000010
+Epoch [ 37/100] TrainLoss: 0.6829 TestLoss: 0.6582 | TrainAcc: 0.5927 TestAcc: 0.6293 | Best: 0.6333 (E24) | LR: 0.000009
+Epoch [ 38/100] TrainLoss: 0.6769 TestLoss: 0.6590 | TrainAcc: 0.6105 TestAcc: 0.6244 | Best: 0.6333 (E24) | LR: 0.000009
+Epoch [ 39/100] TrainLoss: 0.6757 TestLoss: 0.6513 | TrainAcc: 0.6027 TestAcc: 0.6260 | Best: 0.6333 (E24) | LR: 0.000009
+
+早停触发! 15轮没有改善
+
+============================================================
+训练完成! 最佳测试准确率: 0.6333 (Epoch 24)
+============================================================
+
+============================================================
+模型评估
+============================================================
+
+测试集准确率: 0.6260
+
+分类报告:
+              precision    recall  f1-score   support
+
+        Loss       0.58      0.68      0.63       562
+         Win       0.68      0.58      0.63       668
+
+    accuracy                           0.63      1230
+   macro avg       0.63      0.63      0.63      1230
+weighted avg       0.64      0.63      0.63      1230
+
+
+混淆矩阵:
+[[384 178]
+ [282 386]]
+
+============================================================
+训练完成!
+最佳测试准确率: 0.6333
+最终测试准确率: 0.6260
+============================================================
