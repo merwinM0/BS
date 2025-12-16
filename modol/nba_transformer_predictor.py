@@ -192,15 +192,6 @@ class NBATransformerPredictor:
         return self
     
     def create_sequences(self, test_year: str = '2023-24'):
-        """
-        创建基于比赛的滑动窗口序列(路线A)
-        
-        Args:
-            test_year: 测试集年份(最后一年)
-        
-        Returns:
-            训练集和测试集
-        """
         print(f"\n创建比赛级滑动窗口序列 (每场比赛包含主队+客队, 每队窗口大小={self.window_size})...")
 
         df = self.raw_data.copy()
@@ -481,7 +472,6 @@ class NBATransformerPredictor:
         return best_acc
     
     def evaluate(self):
-        """评估模型"""
         print("\n" + "="*60)
         print("模型评估")
         print("="*60)
@@ -528,7 +518,6 @@ class NBATransformerPredictor:
         }
     
     def save_model(self):
-        """保存模型"""
         # 保存PyTorch模型
         model_path = os.path.join(self.model_dir, "transformer_model.pth")
         torch.save(self.model.state_dict(), model_path)
@@ -548,7 +537,6 @@ class NBATransformerPredictor:
             }, f, ensure_ascii=False, indent=2)
     
     def load_model(self, d_model=128, nhead=8, num_layers=4, dropout=0.1):
-        """加载模型"""
         config_path = os.path.join(self.model_dir, "config.json")
         model_path = os.path.join(self.model_dir, "transformer_model.pth")
         scaler_path = os.path.join(self.model_dir, "scaler.pkl")

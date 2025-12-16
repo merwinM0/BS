@@ -20,6 +20,15 @@ dependencies = [
     "fvcore>=0.1.5.post20221221",
     "timm>=1.0.15",
     "pytorch-msssim>=1.0.0",
+    "plotly>=6.5.0",
+    "plotille>=5.0.0",
+    "click>=8.1.8",
+    "rich>=14.2.0",
+    "readchar>=4.2.1",
+    "textual>=6.9.0",
+    "gradio==3.50.2",
+    "huggingface-hub==0.19.4",
+    "scipy>=1.13.1",
 ]
 
 [[tool.uv.index]]
